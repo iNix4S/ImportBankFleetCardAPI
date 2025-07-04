@@ -1,0 +1,6 @@
+@SecureFileAPI_HostAddress = http://localhost:5194
+
+GET {{SecureFileAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
