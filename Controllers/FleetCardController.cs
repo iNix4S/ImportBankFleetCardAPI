@@ -4,6 +4,7 @@ using ImportBankFleetCardAPI.Models;
 using ImportBankFleetCardAPI.Repositories;
 using ImportBankFleetCardAPI.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Threading;
 
 namespace ImportBankFleetCardAPI.Controllers
 {
@@ -30,7 +31,7 @@ namespace ImportBankFleetCardAPI.Controllers
         [HttpPost("import-transactions")]
         [ProducesResponseType(typeof(ImportResult<Dictionary<string, string?>>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(typeof(object), StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(typeof(object), StatusCodes.Status500InternalServerError)] 
         public async Task<IActionResult> ImportTransactions([FromForm] IFormFile file)
         {
             if (file == null || file.Length == 0)
@@ -47,7 +48,7 @@ namespace ImportBankFleetCardAPI.Controllers
             {
                 // บันทึก Log สำหรับ Error ที่ไม่คาดคิดในระดับบนสุด
                 await _loggingService.LogErrorAsync(ex, "An unhandled error occurred in the import process.", $"File: {file.FileName}");
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unexpected error occurred. Please try again later." });
             }
         }
 
@@ -56,8 +57,12 @@ namespace ImportBankFleetCardAPI.Controllers
         /// </summary>
         [HttpGet("transactions/search")]
         [ProducesResponseType(typeof(IEnumerable<FleetCardTransaction>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> SearchTransactions([FromQuery] TransactionSearchCriteria criteria)
+        public async Task<IActionResult> SearchTransactions([FromQuery] TransactionSearchCriteria criteria, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20, CancellationToken cancellationToken = default)
         {
+            // หมายเหตุ: ต้องมีการปรับปรุงเมธอดใน Repository ให้รองรับ pagination และ cancellation token ด้วย
+            // ตัวอย่าง: var transactions = await _repository.SearchTransactionsAsync(criteria, pageNumber, pageSize, cancellationToken);
+            // การเรียกใช้เมธอด SearchTransactionsAsync โดยไม่มี pagination และ CancellationToken เพื่อให้โค้ดคอมไพล์ผ่าน
+            // หากต้องการใช้ความสามารถเหล่านี้ จะต้องไปแก้ไขที่ Interface และ Repository ที่เกี่ยวข้อง
             var transactions = await _repository.SearchTransactionsAsync(criteria);
             return Ok(transactions);
         }
@@ -69,7 +74,7 @@ namespace ImportBankFleetCardAPI.Controllers
         /// <param name="pageSize">จำนวนรายการต่อหน้า</param>
         [HttpGet("master")]
         [ProducesResponseType(typeof(IEnumerable<FleetCard>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetAllMasterData([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20)
+        public async Task<IActionResult> GetAllMasterData([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20, CancellationToken cancellationToken = default)
         {
             var cards = await _repository.GetAllFleetCardsAsync(pageNumber, pageSize);
             return Ok(cards);
@@ -82,7 +87,7 @@ namespace ImportBankFleetCardAPI.Controllers
         [HttpGet("master/{cardNumber}")]
         [ProducesResponseType(typeof(FleetCard), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> GetMasterByCardNumber(string cardNumber)
+        public async Task<IActionResult> GetMasterByCardNumber(string cardNumber, CancellationToken cancellationToken = default)
         {
             var card = await _repository.GetFleetCardByNumberAsync(cardNumber);
             if (card == null)
@@ -95,9 +100,10 @@ namespace ImportBankFleetCardAPI.Controllers
         /// <summary>
         /// สร้างหรืออัปเดตข้อมูลบัตร Master
         /// </summary>
-        [HttpPost("master")]
+        [HttpPut("master")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
-        public async Task<IActionResult> UpsertMasterCard([FromBody] FleetCard card)
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> UpsertMasterCard([FromBody] FleetCard card, CancellationToken cancellationToken = default)
         {
             await _repository.UpsertFleetCardAsync(card);
             return NoContent();
