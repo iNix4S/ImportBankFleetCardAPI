@@ -3,7 +3,7 @@ using System.Data.SqlClient;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 
-namespace SecureFileAPI.Services
+namespace ImportBankFleetCardAPI.Services
 {
     public class SqlServerConnectionService : IDatabaseConnectionService
     {

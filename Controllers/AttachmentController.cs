@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
-using SecureFileAPI.Services;
+using ImportBankFleetCardAPI.Services;
 using System.Threading.Tasks;
 
-namespace SecureFileAPI.Controllers
+namespace ImportBankFleetCardAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
