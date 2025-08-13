@@ -1,6 +1,7 @@
-﻿using ImportBankFleetCardAPI.Config;
+﻿﻿using ImportBankFleetCardAPI.Config;
 using Microsoft.Extensions.Caching.Memory;
 using Oracle.ManagedDataAccess.Client;
+using System.Collections.Generic;
 using System.Data;
 
 namespace ImportBankFleetCardAPI.Config
@@ -24,12 +25,12 @@ namespace ImportBankFleetCardAPI.Config
         /// <summary>
         /* ดึงข้อมูลการตั้งค่าของ Template ตามชื่อที่ระบุ */
         /// </summary>
-        public async Task<Dictionary<string, TemplateFieldConfig>> GetTemplateConfigAsync(string templateName)
+        public async Task<IReadOnlyDictionary<string, TemplateFieldConfig>> GetTemplateConfigAsync(string templateName)
         {
             string cacheKey = $"TemplateConfig_{templateName}";
 
             // 1. ตรวจสอบใน Cache ก่อน ถ้ามีข้อมูลอยู่แล้วให้ดึงจาก Cache ไปใช้ได้เลย
-            if (_cache.TryGetValue(cacheKey, out Dictionary<string, TemplateFieldConfig>? cachedConfig))
+            if (_cache.TryGetValue(cacheKey, out IReadOnlyDictionary<string, TemplateFieldConfig>? cachedConfig))
             {
                 return cachedConfig ?? new Dictionary<string, TemplateFieldConfig>();
             }
@@ -68,6 +69,16 @@ namespace ImportBankFleetCardAPI.Config
             _cache.Set(cacheKey, config, cacheEntryOptions);
             
             return config;
+        }
+
+        /// <summary>
+        /* ล้าง Cache ของ Template ที่ระบุ */
+        /// </summary>
+        public Task ClearCacheForTemplateAsync(string templateName)
+        {
+            string cacheKey = $"TemplateConfig_{templateName}";
+            _cache.Remove(cacheKey);
+            return Task.CompletedTask;
         }
     }
 }

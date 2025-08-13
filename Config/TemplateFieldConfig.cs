@@ -8,21 +8,21 @@
         /// <summary>
         /// ชื่อฟิลด์ข้อมูลทางตรรกะ (เช่น 'CardNumber', 'TransactionDate')
         /// </summary>
-        public string FieldName { get; set; } = string.Empty;
+        public required string FieldName { get; init; }
 
         /// <summary>
         /// ชื่อ Header ในไฟล์ CSV ที่ตรงกับฟิลด์นี้
         /// </summary>
-        public string? SourceColumnName { get; set; }
+        public string? SourceColumnName { get; init; }
 
         /// <summary>
         /// ลำดับคอลัมน์ในไฟล์ Excel ที่ตรงกับฟิลด์นี้
         /// </summary>
-        public int? SourceColumnIndex { get; set; }
+        public int? SourceColumnIndex { get; init; }
 
         /// <summary>
         /// ฟิลด์นี้จำเป็นต้องมีข้อมูลหรือไม่
         /// </summary>
-        public bool IsRequired { get; set; }
+        public required bool IsRequired { get; init; }
     }
 }
