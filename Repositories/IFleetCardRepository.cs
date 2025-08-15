@@ -6,8 +6,12 @@ namespace ImportBankFleetCardAPI.Repositories
     /// <summary>
     /// Interface สำหรับ Repository ที่จัดการการเชื่อมต่อฐานข้อมูล Fleet Card
     /// </summary>
-    public interface IFleetCardRepository
-    {
+        public interface IFleetCardRepository
+        {
+            /// <summary>
+            /// Insert transaction record (for test/demo)
+            /// </summary>
+            Task InsertTransactionAsync(FleetCardTransaction transaction);
         /// <summary>
         /// สร้างหรืออัปเดตข้อมูลบัตร Master
         /// </summary>
@@ -33,5 +37,10 @@ namespace ImportBankFleetCardAPI.Repositories
         /// ค้นหารายการ Transactions ตามเงื่อนไขต่างๆ
         /// </summary>
         Task<IEnumerable<FleetCardTransaction>> SearchTransactionsAsync(TransactionSearchCriteria criteria);
+
+        /// <summary>
+        /// ดึงข้อมูลบัตร Master หนึ่งใบตามรหัสประจำตัว
+        /// </summary>
+        Task<FleetCard?> GetFleetCardByIdAsync(int id);
     }
 }

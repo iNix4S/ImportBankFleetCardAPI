@@ -35,14 +35,16 @@ namespace ImportBankFleetCardAPI.Services
                 throw new Exception($"Configuration for template '{determinedTemplateName}' (derived from filename '{file.FileName}') not found in database.");
             }
 
-            // 3. เลือกว่าจะใช้วิธีประมวลผลแบบไหนตามนามสกุลไฟล์
+            // 3. รองรับเฉพาะไฟล์ Excel (.xlsx, .xls) เท่านั้น
             var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-            return extension switch
+            if (extension == ".xlsx" || extension == ".xls")
             {
-                ".csv" => await ProcessCsvFileAsync(file, config),
-                ".xlsx" or ".xls" => await ProcessXlsxReportAsync(file, config),
-                _ => throw new NotSupportedException("File type not supported. Please upload a .csv, .xls or .xlsx file.")
-            };
+                return await ProcessXlsxReportAsync(file, config);
+            }
+            else
+            {
+                throw new NotSupportedException("File type not supported. Please upload a .xlsx or .xls file only.");
+            }
         }
 
         /// <summary>
@@ -131,20 +133,47 @@ namespace ImportBankFleetCardAPI.Services
                     // ตรวจสอบว่าเป็นแถวข้อมูล Transaction หรือไม่ (โดยดูจากคอลัมน์แรกว่าเป็นวันที่หรือไม่)
                     else if (DateTime.TryParseExact(cellA_Text, "dd/MM/yyyy HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
                     {
+
+                        // Log debug: แสดงค่าทุก field ตาม config
+                        var debugFieldValues = new List<string>();
+                        foreach (var field in config)
+                        {
+                            var value = GetValueFromConfig(worksheet, row, config, field.Key);
+                            debugFieldValues.Add($"{field.Key}: '{value}'");
+                        }
+                        var debugMsg = $"DEBUG: Row {row} - TransactionDateTime: '{cellA_Text}', " + string.Join(", ", debugFieldValues);
+                        await _loggingService.LogErrorAsync(new Exception("Debug"), debugMsg, $"File: {file.FileName}, Row: {row}");
+
+                        var cardNumberDebug = GetValueFromConfig(worksheet, row, config, "CardNumber");
+                        var plateNumberDebug = GetValueFromConfig(worksheet, row, config, "PlateNumber");
                         var rowData = new Dictionary<string, string?>
                         {
-                            ["CardNumber"] = currentCardNumber,
-                            ["PlateNumber"] = currentPlateNumber
+                            ["CardNumber"] = cardNumberDebug,
+                            ["PlateNumber"] = plateNumberDebug
                         };
-                        
+
+                        // ตรวจสอบ CardNumber ที่ Column Index 4 ต้องเป็นตัวเลข 16 หลักเท่านั้น
+                        var cardNumber = rowData["CardNumber"];
+                        if (string.IsNullOrWhiteSpace(cardNumber) || cardNumber.Length != 16 || !cardNumber.All(char.IsDigit))
+                        {
+                            var failureDetail = new ImportFailureDetail {
+                                RowNumber = row,
+                                RawData = rawDataForLog,
+                                ErrorMessage = $"CardNumber '{cardNumber}' is not a valid 16-digit number."
+                            };
+                            result.FailureDetails.Add(failureDetail);
+                            await _loggingService.LogErrorAsync(new Exception("Invalid CardNumber"), failureDetail.ErrorMessage, $"File: {file.FileName}, Row: {row}");
+                            continue;
+                        }
+
                         foreach(var field in config)
                         {
-                             if(!field.Key.EndsWith("Header"))
-                             {
-                                 rowData[field.Key] = GetValueFromConfig(worksheet, row, config, field.Key);
-                             }
+                            if(!field.Key.EndsWith("Header") && field.Key != "CardNumber" && field.Key != "PlateNumber")
+                            {
+                                rowData[field.Key] = GetValueFromConfig(worksheet, row, config, field.Key);
+                            }
                         }
-                        
+
                         var (status, errorMessage) = await _repository.ProcessTransactionRowAsync(rowData);
                         if (status == "COMPLETED")
                         {
@@ -176,21 +205,11 @@ namespace ImportBankFleetCardAPI.Services
         private string DetermineTemplateNameFromFileName(string fileName)
         {
             var upperFileName = fileName.ToUpperInvariant();
-
-            if (upperFileName.StartsWith("VAT_"))
+            if (upperFileName.StartsWith("VAT_") || upperFileName.StartsWith("NOVAT_"))
             {
-                return "VAT_CSV_TEMPLATE";
+                return "ORPT_MONTHLY_REPORT";
             }
-            if (upperFileName.StartsWith("NOVAT_"))
-            {
-                return "NOVAT_CSV_TEMPLATE";
-            }
-            if (upperFileName.Contains("REPORT"))
-            {
-                 return "ORPT_MONTHLY_REPORT";
-            }
-            
-            throw new ArgumentException("Invalid filename format. Cannot determine template type from filename.");
+            throw new ArgumentException("Invalid filename format. Only files starting with VAT_ or NOVAT_ are supported.");
         }
         
         /// <summary>

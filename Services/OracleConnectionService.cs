@@ -10,6 +10,14 @@ namespace ImportBankFleetCardAPI.Services
     {
         private readonly string _connectionString;
 
+        // คืน OracleConnection ที่เปิดแล้ว (caller ต้อง dispose)
+        public async Task<OracleConnection> GetOpenConnectionAsync()
+        {
+            var connection = new OracleConnection(_connectionString);
+            await connection.OpenAsync();
+            return connection;
+        }
+
         public OracleConnectionService(IConfiguration configuration)
         {
             _connectionString = configuration.GetConnectionString("Oracle") 

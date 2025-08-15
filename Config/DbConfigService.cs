@@ -8,17 +8,15 @@ namespace ImportBankFleetCardAPI.Config
 {
     public class DbConfigService : IConfigService
     {
-        private readonly string _connectionString;
+        private readonly Services.IDatabaseConnectionService _oracleConnectionService;
         private readonly IMemoryCache _cache;
 
         /// <summary>
-        /* Constructor รับ IConfiguration สำหรับอ่าน Connection String */
-        /* และ IMemoryCache สำหรับทำ Caching */
+        /* Constructor รับ OracleConnectionService และ IMemoryCache สำหรับทำ Caching */
         /// </summary>
-        public DbConfigService(IConfiguration configuration, IMemoryCache cache)
+        public DbConfigService(Services.IDatabaseConnectionService oracleConnectionService, IMemoryCache cache)
         {
-            _connectionString = configuration.GetConnectionString("Oracle") 
-                ?? throw new InvalidOperationException("Oracle Connection String ('Oracle') is not configured in appsettings.json.");
+            _oracleConnectionService = oracleConnectionService;
             _cache = cache;
         }
 
@@ -37,13 +35,12 @@ namespace ImportBankFleetCardAPI.Config
 
             // 2. ถ้าใน Cache ไม่มีข้อมูล ให้ไปดึงจากฐานข้อมูล
             var config = new Dictionary<string, TemplateFieldConfig>();
-            await using var connection = new OracleConnection(_connectionString);
+            await using var connection = await _oracleConnectionService.GetOpenConnectionAsync();
             var sql = "SELECT FIELD_NAME, SOURCE_COLUMN_NAME, SOURCE_COLUMN_INDEX, IS_REQUIRED FROM EFM_FED.FLEET_CARD_IMPORT_CONFIGS WHERE TEMPLATE_NAME = :p_TemplateName";
-            
-            await using var command = new OracleCommand(sql, connection);
-            command.Parameters.Add("p_TemplateName", OracleDbType.Varchar2, templateName, ParameterDirection.Input);
 
-            await connection.OpenAsync();
+            await using var command = new Oracle.ManagedDataAccess.Client.OracleCommand(sql, connection);
+            command.Parameters.Add("p_TemplateName", Oracle.ManagedDataAccess.Client.OracleDbType.Varchar2, templateName, System.Data.ParameterDirection.Input);
+
             await using var reader = await command.ExecuteReaderAsync();
 
             while (await reader.ReadAsync())

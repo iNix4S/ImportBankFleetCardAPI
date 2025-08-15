@@ -5,30 +5,29 @@ namespace ImportBankFleetCardAPI.Logging
 {
     public class DbLoggingService : ILoggingService
     {
-        private readonly string _connectionString;
+        private readonly Services.IDatabaseConnectionService _oracleConnectionService;
 
-        public DbLoggingService(IConfiguration configuration)
+        public DbLoggingService(Services.IDatabaseConnectionService oracleConnectionService)
         {
-            _connectionString = configuration.GetConnectionString("Oracle")
-                ?? throw new InvalidOperationException("Oracle Connection String ('Oracle') is not configured in appsettings.json.");
+            _oracleConnectionService = oracleConnectionService;
         }
 
         public async Task LogErrorAsync(Exception ex, string message, string? contextInfo = null)
         {
             try
             {
-                await using var connection = new OracleConnection(_connectionString);
-                await using var command = new OracleCommand("FLEET_CARD_API_PKG.SP_INSERT_APP_LOG", connection)
+                await using var connection = await _oracleConnectionService.GetOpenConnectionAsync();
+                await using var command = new Oracle.ManagedDataAccess.Client.OracleCommand(@"INSERT INTO FLEET_CARD_APP_LOGS (LOG_TIMESTAMP, LOG_LEVEL, MESSAGE, STACK_TRACE, CONTEXT_INFO)
+                    VALUES (SYSTIMESTAMP, :logLevel, :message, :stackTrace, :contextInfo)", connection)
                 {
-                    CommandType = CommandType.StoredProcedure
+                    CommandType = System.Data.CommandType.Text
                 };
 
-                command.Parameters.Add("p_LogLevel", "ERROR");
-                command.Parameters.Add("p_Message", OracleDbType.Varchar2, ex.Message, ParameterDirection.Input);
-                command.Parameters.Add("p_StackTrace", OracleDbType.Clob, ex.ToString(), ParameterDirection.Input);
-                command.Parameters.Add("p_ContextInfo", OracleDbType.Varchar2, $"{message} | Context: {contextInfo ?? "N/A"}", ParameterDirection.Input);
+                command.Parameters.Add(":logLevel", Oracle.ManagedDataAccess.Client.OracleDbType.Varchar2, 20).Value = "ERROR";
+                command.Parameters.Add(":message", Oracle.ManagedDataAccess.Client.OracleDbType.Varchar2, 4000).Value = ex.Message;
+                command.Parameters.Add(":stackTrace", Oracle.ManagedDataAccess.Client.OracleDbType.Clob).Value = ex.ToString();
+                command.Parameters.Add(":contextInfo", Oracle.ManagedDataAccess.Client.OracleDbType.Varchar2, 1000).Value = $"{message} | Context: {contextInfo ?? "N/A"}";
 
-                await connection.OpenAsync();
                 await command.ExecuteNonQueryAsync();
             }
             catch (Exception dbEx)
